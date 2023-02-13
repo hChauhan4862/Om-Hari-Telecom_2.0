@@ -70,7 +70,7 @@ jQuery('.demo-icon').click(function () {
 });
 
 //p-scroll bar
-const ps5 = new PerfectScrollbar('.sidebar-right1', {
+const ps5 = new PerfectScrollbar('.sidebar-right', {
 	useBothWheelAxes: true,
 	suppressScrollX: true,
 });

@@ -1,12 +1,59 @@
 from src.endpoints._base import *
 from src.models._base import *
 from .uid_validator import is_uid
+from src.endpoints.aadhaar.classAadhaarPDF import AadhaarPDF
+from fastapi import BackgroundTasks
 import requests
+import os
 
 router = APIRouter(
     prefix="/aadhaar",
     tags=["Aadhaar API"]
 )
+
+def updatePDFList(db: Session):
+    AADHAAR_DIR = "tmp/AADHAAR_FILES"
+    for file in os.listdir(AADHAAR_DIR):
+        # skip if file is directory
+        if os.path.isdir(AADHAAR_DIR+"/"+file): continue
+        print("RUNNING FOR :: ",file, " :: ", end="")
+        try:
+            with open(AADHAAR_DIR+"/"+file, "rb") as f:
+                aadhaar = AadhaarPDF(f,password="202132", bruteForce=True)
+                json = aadhaar.get()
+                assert json, "FAILED"
+        except Exception as e:
+            # move file rename to AADHAAR_DIR/error/{file}.pdf
+            if str(e) != "Could not brute force the password":
+                os.rename(AADHAAR_DIR+"/"+file, AADHAAR_DIR+"/error/"+file)
+            print(e)
+            continue
+        EXIST = db.query(aadhaar_pdf).filter(aadhaar_pdf.UID == json.UID).first()
+        if EXIST:
+            # compare download date and delete if older by converting to datetime
+            if not json.DownloadDate or EXIST.DownloadDate < datetime.datetime.strptime(json.DownloadDate, "%Y-%m-%d").date():
+                db.delete(EXIST)
+                db.commit()
+            else:
+                # move file rename to AADHAAR_DIR/done/{name} {yob}{pinCode}-{uid} {datetimeepoch}.pdf
+                yob = json.DOB.split("-")[0]
+                newFileName = f"{json.Name} {yob} {json.PinCode}-{json.UID} {datetime.datetime.now().timestamp()}.pdf"
+                os.rename(AADHAAR_DIR+"/"+file, AADHAAR_DIR+"/done/"+newFileName)
+                continue
+        # add to db
+        db.add(aadhaar_pdf(**(dict(json.__dict__))))
+        db.commit()
+
+        # move file rename to AADHAAR_DIR/done/{name} {yob}{pinCode}-{uid} {datetimeepoch}.pdf
+        yob = json.DOB.split("-")[0]
+        newFileName = f"{json.Name} {yob} {json.PinCode}-{json.UID} {datetime.datetime.now().timestamp()}.pdf"
+        os.rename(AADHAAR_DIR+"/"+file, AADHAAR_DIR+"/done/"+newFileName)
+        print("SUCCESS")
+
+@router.get("/updatePDFList")
+async def test_page(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    background_tasks.add_task(updatePDFList, db)
+    return hcRes(detail="Updating PDF List")
 
 @router.get("/check_uid/{uid}")
 async def uid_validator(uid: str):

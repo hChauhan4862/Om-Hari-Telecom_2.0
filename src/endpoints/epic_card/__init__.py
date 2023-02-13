@@ -22,7 +22,7 @@ async def epic_captcha_verify(captcha: str = Query(...)):
     return EPIC(me.username).verify_captcha(captcha)
 
 @router.get("/fetch_details/")
-async def epic_fetch_details(epic: str = Query(...), state: str = Query(default="S24") ):
+async def epic_fetch_details(epic: str = Query(...,regex=VOTER_EPIC_REGEX), state: str = Query(default="S24") ):
     # me: Me = Security(get_current_user, scopes=[])
     me: Me = MeObj(username="harendra",uid=0,role="TEST_USER",db=None) # for testing purpose only
     return EPIC(me.username).fetch_details(epic, state)

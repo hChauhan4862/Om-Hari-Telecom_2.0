@@ -169,7 +169,7 @@ $(function (e) {
     monthNamesShort: ["Jan", "Feb", "Mar", "Apr", "Maj", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"]
   }); // Timepiocker
 
-  $('#tpBasic').timepicker(); // Countdonwtimer
+  // $('#tpBasic').timepicker(); // Countdonwtimer
 
   $("#clocktimer").countdowntimer({
     currentTime: true,

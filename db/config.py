@@ -4,6 +4,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import String,Text, Unicode, UnicodeText, Integer, SmallInteger, BigInteger, Numeric, Float, DateTime, Date, Time
 from sqlalchemy import LargeBinary, Enum, Boolean, JSON, ARRAY, TIMESTAMP, ForeignKey
+from sqlalchemy.dialects.mysql import LONGTEXT, MEDIUMTEXT, TINYTEXT, TINYINT, MEDIUMINT, BIGINT, DOUBLE, FLOAT, DECIMAL, BIT, BLOB, MEDIUMBLOB, LONGBLOB, YEAR, DATE, TIME, DATETIME, TIMESTAMP, SET, ENUM, INTEGER, VARCHAR, CHAR, TEXT
 from sqlalchemy import Column
 import platform
 import datetime
@@ -75,6 +76,38 @@ class uid_cards_history(Base):
    image_data = Column(Text, nullable = False)
    add_by = Column(Integer, ForeignKey('authInfo.uid'), nullable = False)
    add_time = Column(TIMESTAMP, nullable = False)
+
+class aadhaar_pdf(Base):
+   __tablename__ = 'aadhaar_pdf'
+   UID = Column(String(12), primary_key = True, unique = True, nullable = False, index = True)
+   Name = Column(String(255))
+   DOB = Column(Date)
+   Gender = Column(String(1))
+   Photo = Column(Text(2097152))
+   Mobile = Column(String(10))
+   CareOf = Column(String(255))
+   Locality = Column(String(255))
+   VillageTown = Column(String(255))
+   PostOffice = Column(String(255))
+   District = Column(String(255))
+   SubDistrict = Column(String(255))
+   State = Column(String(255))
+   Address = Column(String(255))
+   
+   local_language = Column(String(255))
+   local_Name = Column(String(255))
+   local_CareOf = Column(String(255))
+   # local_Locality = Column(String(255))
+   # local_VillageTown = Column(String(255))
+   # local_PostOffice = Column(String(255))
+   # local_District = Column(String(255))
+   # local_SubDistrict = Column(String(255))
+   # local_State = Column(String(255))
+   local_Address = Column(String(255))
+
+   PinCode = Column(String(6))  # pincode
+   IssueDate = Column(Date)
+   DownloadDate = Column(Date)
 
 class bhulekhVillages(Base):
    __tablename__ = 'bhulekhVillages'
