@@ -110,14 +110,26 @@ async def read_root(db: Session = Depends(get_db)):
 app.include_router(token_router)
 app.include_router(api_router)
 app.include_router(swagger_ui_router)
-app.mount("/", StaticFiles(directory="static"), name="static")
 
-@app.exception_handler(404)
-async def custom_404_handler(req, exc):
-    # if path starts with /api then return json response
-    if req.url.path.startswith("/api"):
-        return JSONResponse({"error": True, "error_code": 404 , "detail" : "Not Found", "data" : {}}, status_code=404)
-    return FileResponse('./static/index.html')
+
+app.mount("/static", StaticFiles(directory="frontend/static"), name="static_files")
+app.mount("/assets", StaticFiles(directory="frontend/assets"), name="assets_files")
+
+class SPAStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 404:
+            response = await super().get_response('.', scope)
+        return response
+app.mount('/', SPAStaticFiles(directory='frontend', html=True), name='frontend_app')
+
+
+# @app.exception_handler(404)
+# async def custom_404_handler(req, exc):
+#     # if path starts with /api then return json response
+#     if req.url.path.startswith("/api"):
+#         return JSONResponse({"error": True, "error_code": 404 , "detail" : "Not Found", "data" : {}}, status_code=404)
+#     return FileResponse('./static/index.html')
 
 if __name__ == '__main__':
     uvicorn.run("main:app", host='0.0.0.0', port=8000, log_level="info", reload=True, server_header=False)
