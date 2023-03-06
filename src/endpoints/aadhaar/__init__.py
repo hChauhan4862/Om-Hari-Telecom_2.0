@@ -2,64 +2,94 @@ from src.endpoints._base import *
 from src.models._base import *
 from .uid_validator import is_uid
 from src.endpoints.aadhaar.classAadhaarPDF import AadhaarPDF
-from fastapi import BackgroundTasks
 import requests
-import os
 
 router = APIRouter(
     prefix="/aadhaar",
     tags=["Aadhaar API"]
 )
 
-def updatePDFList(db: Session):
-    AADHAAR_DIR = "tmp/AADHAAR_FILES"
-    for file in os.listdir(AADHAAR_DIR):
-        # skip if file is directory
-        if os.path.isdir(AADHAAR_DIR+"/"+file): continue
-        print("RUNNING FOR :: ",file, " :: ", end="")
-        try:
-            with open(AADHAAR_DIR+"/"+file, "rb") as f:
-                aadhaar = AadhaarPDF(f,password="202132", bruteForce=True)
-                json = aadhaar.get()
-                assert json, "FAILED"
-        except Exception as e:
-            # move file rename to AADHAAR_DIR/error/{file}.pdf
-            if str(e) != "Could not brute force the password":
-                os.rename(AADHAAR_DIR+"/"+file, AADHAAR_DIR+"/error/"+file)
-            print(e)
-            continue
-        EXIST = db.query(aadhaar_pdf).filter(aadhaar_pdf.UID == json.UID).first()
-        if EXIST:
-            # compare download date and delete if older by converting to datetime
-            if not json.DownloadDate or EXIST.DownloadDate < datetime.datetime.strptime(json.DownloadDate, "%Y-%m-%d").date():
-                db.delete(EXIST)
-                db.commit()
-            else:
-                # move file rename to AADHAAR_DIR/done/{name} {yob}{pinCode}-{uid} {datetimeepoch}.pdf
-                yob = json.DOB.split("-")[0]
-                newFileName = f"{json.Name} {yob} {json.PinCode}-{json.UID} {datetime.datetime.now().timestamp()}.pdf"
-                os.rename(AADHAAR_DIR+"/"+file, AADHAAR_DIR+"/done/"+newFileName)
-                continue
-        # add to db
-        db.add(aadhaar_pdf(**(dict(json.__dict__))))
-        db.commit()
-
-        # move file rename to AADHAAR_DIR/done/{name} {yob}{pinCode}-{uid} {datetimeepoch}.pdf
-        yob = json.DOB.split("-")[0]
-        newFileName = f"{json.Name} {yob} {json.PinCode}-{json.UID} {datetime.datetime.now().timestamp()}.pdf"
-        os.rename(AADHAAR_DIR+"/"+file, AADHAAR_DIR+"/done/"+newFileName)
-        print("SUCCESS")
-
-@router.get("/updatePDFList")
-async def test_page(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    background_tasks.add_task(updatePDFList, db)
-    return hcRes(detail="Updating PDF List")
-
 @router.get("/check_uid/{uid}")
 async def uid_validator(uid: str):
     if not is_uid(uid):
         raise hcCustomException(detail="Invalid Aadhaar Number", status_code = 400)
     return hcRes(detail="Valid Aadhaar Number")
+
+####### [:START:] API to fetch aadhaar data from Database #######
+
+@router.get("/all_list")
+async def all_aadhaar_list_in_database():
+    return hcRes(detail="success",data=deta_obj.db.aadhaar_originalsFetch())
+
+@router.get("/search_uid/{uid}")
+async def all_copy_of_aadhaar_no(uid: str):
+    if not is_uid(uid):
+        raise hcCustomException(detail="Invalid Aadhaar Number", status_code = 400)
+    return hcRes(detail="success",data=deta_obj.db.aadhaar_originalsFetch(UID=uid))
+
+@router.get("/json/{key}")
+async def aadhaar_json_by_key(key: str):
+    if len(key) != 12:
+        raise hcCustomException(detail="Invalid Aadhaar Unique Key", status_code = 400)
+    data = deta_obj.db.aadhaar_originalsFetch(key=key)
+    if len(data) == 0:
+        raise hcCustomException(detail="Aadhaar not found", status_code = 404)
+    data = data[0]
+    return hcRes(detail="success",data=data)
+
+@router.get("/images/{key}.jpg")
+async def aadhaar_image_by_key(key: str):
+    try:
+        assert len(key) == 12, "Invalid Aadhaar Unique Key"
+        file = deta_obj.files.aadhaar_originals.get(key)
+        return StreamingResponse(BytesIO(file.read()), media_type="image/jpeg")
+    except Exception as e:
+        raise hcCustomException(detail="File not found", status_code = 404)
+
+@router.get("/qr/{key}.jpg")
+async def aadhaar_qr_by_key(key: str):
+    try:
+        assert len(key) == 12, "Invalid Aadhaar Unique Key"
+        data = deta_obj.db.aadhaar_originalsFetch(key=key)
+        assert len(data) > 0, "Aadhaar not found"
+        data = data[0]
+
+        TEXT = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<PrintLetterBarcodeData "
+        TEXT += 'uid="' + data['UID'] + '" '
+        TEXT += 'name="' + data['Name'] + '" '
+        TEXT += 'gender="' + data['Gender'] + '" ' if "Gender" in data and data["Gender"] != None and data["Gender"] != "" else ""
+        TEXT += 'yob="' + data['DOB'].split("-")[0] + '" ' if "DOB" in data and data["DOB"] != None and data["DOB"] != "" else ""
+        TEXT += 'co="' + data['CareOf'] + '" ' if "CareOf" in data and data["CareOf"] != None and data["CareOf"] != "" else ""
+        TEXT += 'loc="' + data['Locality'] + '" ' if "Locality" in data and data["Locality"] != None and data["Locality"] != "" else ""
+        TEXT += 'vtc="' + data['VillageTown'] + '" ' if "VillageTown" in data and data["VillageTown"] != None and data["VillageTown"] != "" else ""
+        TEXT += 'po="' + data['PostOffice'] + '" ' if "PostOffice" in data and data["PostOffice"] != None and data["PostOffice"] != "" else ""
+        TEXT += 'dist="' + data['District'] + '" ' if "District" in data and data["District"] != None and data["District"] != "" else ""
+        TEXT += 'subdist="' + data['SubDistrict'] + '" ' if "SubDistrict" in data and data["SubDistrict"] != None and data["SubDistrict"] != "" else ""
+        TEXT += 'state="' + data['State'] + '" ' if "State" in data and data["State"] != None and data["State"] != "" else ""
+        TEXT += 'pc="' + data['PinCode'] + '" ' if "PinCode" in data and data["PinCode"] != None and data["PinCode"] != "" else ""
+        TEXT += 'yob="' + "/".join(data['DOB'].split("-")) + '" ' if "DOB" in data and data["DOB"] != None and data["DOB"] != "" else ""
+        TEXT += "/>"
+        from qrcode import QRCode
+
+        qr = QRCode(version=1, box_size=2, border=1)
+        qr.add_data(TEXT)
+        qr.make(fit=True)
+        # Generate the QR code image
+        img = qr.make_image(fill_color="black", back_color="white")
+        # Resize the image to 70x70 pixels
+        # img = img.resize((70, 70))
+
+        # Save the image to a file
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        
+        return StreamingResponse(buffer, media_type="image/jpeg")
+    except Exception as e:
+        print(e)
+        raise hcCustomException(detail="File not found", status_code = 404)
+
+####### [:END:] API to fetch aadhaar data from Database #######
 
 
 class verify_uid_req(BaseModel):

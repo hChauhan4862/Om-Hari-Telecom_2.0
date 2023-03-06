@@ -1,32 +1,25 @@
 import requests
 from bs4 import BeautifulSoup
-
-from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import func
-from db.config import bhulekhVillages, configSettings
 import datetime
 from src.endpoints._base import hcRes
+from db import deta_obj
 import re
 
 
 class hcBhulekh:
-    def __init__(self, db: Session = None) -> None:
+    def __init__(self) -> None:
         self.__base_url = "https://upbhulekh.gov.in/public/public_ror/"
-        self.__db = db
     
     def village_search_json(self, search_keyword, offset=0):
+        
         if isinstance(search_keyword, int):
             # search by village code
-            villages = self.__db.query(bhulekhVillages).filter(bhulekhVillages.village_code==search_keyword).limit(1).first()
+            villages = deta_obj.db.ror_villagesLists(village_code=search_keyword)
             return hcRes(data=villages)
-
-        # top 50 villages
-        villages = self.__db.query(bhulekhVillages).filter(
-            bhulekhVillages.village_name.ilike("%{}%".format(search_keyword))
-        ).order_by(
-            func.length(bhulekhVillages.village_name).asc()
-        ).limit(50).offset(offset).all()
-
+        
+        # top 50 search by village name
+        villages = deta_obj.db.ror_villagesLists(village_name=search_keyword)[offset:offset+50]
         return hcRes(data=villages)
     
     def list_search(self,village_code,act,value):
@@ -44,7 +37,8 @@ class hcBhulekh:
     def khata_json(self, khata_no, village_code):
         # pad 0 to khata_no
         khata_no = str(khata_no).zfill(5)
-        VILLAGE_INFO = self.__db.query(bhulekhVillages).filter(bhulekhVillages.village_code == village_code).first()
+        VILLAGE_INFO = deta_obj.db.ror_villagesLists(village_code=village_code)
+        VILLAGE_INFO = VILLAGE_INFO[0] if len(VILLAGE_INFO) else None
         if not VILLAGE_INFO:
             return hcRes(detail="Village not found",error=True,error_code=404)
         if not VILLAGE_INFO.flag_khatauni and not VILLAGE_INFO.flag_ansh and not VILLAGE_INFO.flag_rtk:
@@ -141,7 +135,9 @@ class hcBhulekh:
     def ansh_json(self, khata_no, village_code):
         # pad 0 to khata_no
         khata_no = str(khata_no).zfill(5)
-        VILLAGE_INFO = self.__db.query(bhulekhVillages).filter(bhulekhVillages.village_code == village_code).first()
+        VILLAGE_INFO = deta_obj.db.ror_villagesLists(village_code=village_code)
+        VILLAGE_INFO = VILLAGE_INFO[0] if len(VILLAGE_INFO) else None
+
         if not VILLAGE_INFO:
             return hcRes(detail="Village not found",error=True,error_code=404)
         if not VILLAGE_INFO.flag_ansh and not VILLAGE_INFO.flag_rtk:
@@ -217,140 +213,140 @@ class hcBhulekh:
 
     ###########################################################################################################
 
-    def update_villages_list_task(self):
-        print("Updating villages list")
-        VILLAGES = {}
-        # get all districts
-        try:
-            districts = self.__get_data("act=fillDistrict", json=True)
-            for district in districts:
-                print("NORMAL: ",district["district_name_english"])
-                # get all tehsils
-                tehsils = self.__get_data("act=fillTehsil&district_code=" + district["district_code_census"], json=True)
-                for tehsil in tehsils:
-                    # get all villages
-                    villages = self.__get_data("act=fillVillage&district_code=" + district["district_code_census"] + "&tehsil_code=" + tehsil["tehsil_code_census"], json=True)
-                    for village in villages:
-                        INDEX = "{}/{}/{}".format(district["district_code_census"], tehsil["tehsil_code_census"], village["village_code_census"])
-                        if INDEX not in VILLAGES:
-                            VILLAGES[INDEX] = {}
+    # def update_villages_list_task(self):
+    #     print("Updating villages list")
+    #     VILLAGES = {}
+    #     # get all districts
+    #     try:
+    #         districts = self.__get_data("act=fillDistrict", json=True)
+    #         for district in districts:
+    #             print("NORMAL: ",district["district_name_english"])
+    #             # get all tehsils
+    #             tehsils = self.__get_data("act=fillTehsil&district_code=" + district["district_code_census"], json=True)
+    #             for tehsil in tehsils:
+    #                 # get all villages
+    #                 villages = self.__get_data("act=fillVillage&district_code=" + district["district_code_census"] + "&tehsil_code=" + tehsil["tehsil_code_census"], json=True)
+    #                 for village in villages:
+    #                     INDEX = "{}/{}/{}".format(district["district_code_census"], tehsil["tehsil_code_census"], village["village_code_census"])
+    #                     if INDEX not in VILLAGES:
+    #                         VILLAGES[INDEX] = {}
 
-                        VILLAGES[INDEX].update({
-                            # "index": INDEX,
-                            "district_name": district["district_name_english"],
-                            "district_code": district["district_code_census"],
-                            "district_hindi": district["district_name"],
+    #                     VILLAGES[INDEX].update({
+    #                         # "index": INDEX,
+    #                         "district_name": district["district_name_english"],
+    #                         "district_code": district["district_code_census"],
+    #                         "district_hindi": district["district_name"],
 
-                            "tehsil_name": tehsil["tehsil_name_english"],
-                            "tehsil_code": tehsil["tehsil_code_census"],
-                            "tehsil_hindi": tehsil["tehsil_name"],
+    #                         "tehsil_name": tehsil["tehsil_name_english"],
+    #                         "tehsil_code": tehsil["tehsil_code_census"],
+    #                         "tehsil_hindi": tehsil["tehsil_name"],
 
-                            "village_name": village["vname_eng"],
-                            "village_code": village["village_code_census"],
-                            "village_hindi": village["vname"],
+    #                         "village_name": village["vname_eng"],
+    #                         "village_code": village["village_code_census"],
+    #                         "village_hindi": village["vname"],
 
-                            "paragna_hindi": village["pname"],
-                            "paragna_code": village["pargana_code_new"],
+    #                         "paragna_hindi": village["pname"],
+    #                         "paragna_code": village["pargana_code_new"],
 
-                            "flag_survey": 0 if village["flg_survey"] == "N" else 1,
-                            "flag_chakbandi": 0 if village["flg_chakbandi"] == "N" else 1,
+    #                         "flag_survey": 0 if village["flg_survey"] == "N" else 1,
+    #                         "flag_chakbandi": 0 if village["flg_chakbandi"] == "N" else 1,
 
-                            "flag_khatauni": 1
-                        })
+    #                         "flag_khatauni": 1
+    #                     })
                         
-            districts = self.__get_data("act=fillDistrictAnsh", json=True)
-            for district in districts:
-                print("ANSH: ",district["district_name_english"])
-                # get all tehsils
-                tehsils = self.__get_data("act=fillTehsilAnsh&district_code=" + district["district_code_census"], json=True)
-                for tehsil in tehsils:
-                    # get all villages
-                    villages = self.__get_data("act=fillVillageAnsh&district_code=" + district["district_code_census"] + "&tehsil_code=" + tehsil["tehsil_code_census"], json=True)
-                    for village in villages:
-                        INDEX = "{}/{}/{}".format(district["district_code_census"], tehsil["tehsil_code_census"], village["village_code_census"])
-                        if INDEX not in VILLAGES:
-                            VILLAGES[INDEX] = {}
+    #         districts = self.__get_data("act=fillDistrictAnsh", json=True)
+    #         for district in districts:
+    #             print("ANSH: ",district["district_name_english"])
+    #             # get all tehsils
+    #             tehsils = self.__get_data("act=fillTehsilAnsh&district_code=" + district["district_code_census"], json=True)
+    #             for tehsil in tehsils:
+    #                 # get all villages
+    #                 villages = self.__get_data("act=fillVillageAnsh&district_code=" + district["district_code_census"] + "&tehsil_code=" + tehsil["tehsil_code_census"], json=True)
+    #                 for village in villages:
+    #                     INDEX = "{}/{}/{}".format(district["district_code_census"], tehsil["tehsil_code_census"], village["village_code_census"])
+    #                     if INDEX not in VILLAGES:
+    #                         VILLAGES[INDEX] = {}
 
-                        VILLAGES[INDEX].update({
-                            # "index": INDEX,
-                            "district_name": district["district_name_english"],
-                            "district_code": district["district_code_census"],
-                            "district_hindi": district["district_name"],
+    #                     VILLAGES[INDEX].update({
+    #                         # "index": INDEX,
+    #                         "district_name": district["district_name_english"],
+    #                         "district_code": district["district_code_census"],
+    #                         "district_hindi": district["district_name"],
 
-                            "tehsil_name": tehsil["tehsil_name_english"],
-                            "tehsil_code": tehsil["tehsil_code_census"],
-                            "tehsil_hindi": tehsil["tehsil_name"],
+    #                         "tehsil_name": tehsil["tehsil_name_english"],
+    #                         "tehsil_code": tehsil["tehsil_code_census"],
+    #                         "tehsil_hindi": tehsil["tehsil_name"],
 
-                            "village_name": village["vname_eng"],
-                            "village_code": village["village_code_census"],
-                            "village_hindi": village["vname"],
+    #                         "village_name": village["vname_eng"],
+    #                         "village_code": village["village_code_census"],
+    #                         "village_hindi": village["vname"],
 
-                            "paragna_hindi": village["pname"],
-                            "paragna_code": village["pargana_code_new"],
+    #                         "paragna_hindi": village["pname"],
+    #                         "paragna_code": village["pargana_code_new"],
 
-                            "flag_survey": 0 if village["flg_survey"] == "N" else 1,
-                            "flag_chakbandi": 0 if village["flg_chakbandi"] == "N" else 1,
+    #                         "flag_survey": 0 if village["flg_survey"] == "N" else 1,
+    #                         "flag_chakbandi": 0 if village["flg_chakbandi"] == "N" else 1,
 
-                            "flag_ansh": 1
-                        })
+    #                         "flag_ansh": 1
+    #                     })
 
                         
-            districts = self.__get_data("act=fillDistrictAnshNew", json=True)
-            for district in districts:
-                print("RTK: ",district["district_name_english"])
-                # get all tehsils
-                tehsils = self.__get_data("act=fillTehsilAnshNew&district_code=" + district["district_code_census"], json=True)
-                for tehsil in tehsils:
-                    # get all villages
-                    villages = self.__get_data("act=fillVillageAnshNew&district_code=" + district["district_code_census"] + "&tehsil_code=" + tehsil["tehsil_code_census"], json=True)
-                    for village in villages:
-                        INDEX = "{}/{}/{}".format(district["district_code_census"], tehsil["tehsil_code_census"], village["village_code_census"])
-                        if INDEX not in VILLAGES:
-                            VILLAGES[INDEX] = {}
+    #         districts = self.__get_data("act=fillDistrictAnshNew", json=True)
+    #         for district in districts:
+    #             print("RTK: ",district["district_name_english"])
+    #             # get all tehsils
+    #             tehsils = self.__get_data("act=fillTehsilAnshNew&district_code=" + district["district_code_census"], json=True)
+    #             for tehsil in tehsils:
+    #                 # get all villages
+    #                 villages = self.__get_data("act=fillVillageAnshNew&district_code=" + district["district_code_census"] + "&tehsil_code=" + tehsil["tehsil_code_census"], json=True)
+    #                 for village in villages:
+    #                     INDEX = "{}/{}/{}".format(district["district_code_census"], tehsil["tehsil_code_census"], village["village_code_census"])
+    #                     if INDEX not in VILLAGES:
+    #                         VILLAGES[INDEX] = {}
 
-                        VILLAGES[INDEX].update({
-                            # "index": INDEX,
-                            "district_name": district["district_name_english"],
-                            "district_code": district["district_code_census"],
-                            "district_hindi": district["district_name"],
+    #                     VILLAGES[INDEX].update({
+    #                         # "index": INDEX,
+    #                         "district_name": district["district_name_english"],
+    #                         "district_code": district["district_code_census"],
+    #                         "district_hindi": district["district_name"],
 
-                            "tehsil_name": tehsil["tehsil_name_english"],
-                            "tehsil_code": tehsil["tehsil_code_census"],
-                            "tehsil_hindi": tehsil["tehsil_name"],
+    #                         "tehsil_name": tehsil["tehsil_name_english"],
+    #                         "tehsil_code": tehsil["tehsil_code_census"],
+    #                         "tehsil_hindi": tehsil["tehsil_name"],
 
-                            "village_name": village["vname_eng"],
-                            "village_code": village["village_code_census"],
-                            "village_hindi": village["vname"],
+    #                         "village_name": village["vname_eng"],
+    #                         "village_code": village["village_code_census"],
+    #                         "village_hindi": village["vname"],
 
-                            "paragna_hindi": village["pname"],
-                            "paragna_code": village["pargana_code_new"],
+    #                         "paragna_hindi": village["pname"],
+    #                         "paragna_code": village["pargana_code_new"],
 
-                            "flag_survey": 0 if village["flg_survey"] == "N" else 1,
-                            "flag_chakbandi": 0 if village["flg_chakbandi"] == "N" else 1,
+    #                         "flag_survey": 0 if village["flg_survey"] == "N" else 1,
+    #                         "flag_chakbandi": 0 if village["flg_chakbandi"] == "N" else 1,
 
-                            "flag_rtk": 1
-                        })
+    #                         "flag_rtk": 1
+    #                     })
 
-            # delete all rows from bhulekhVillages
-            # with open("bhulekhVillages.json", "w") as f:
-            #     f.write(json.dumps(VILLAGES, indent=4))
+    #         # delete all rows from bhulekhVillages
+    #         # with open("bhulekhVillages.json", "w") as f:
+    #         #     f.write(json.dumps(VILLAGES, indent=4))
 
-            self.__db.query(bhulekhVillages).delete()
+    #         self.__db.query(bhulekhVillages).delete()
 
-            # insert all villages
-            self.__db.add_all([bhulekhVillages(**village) for village in VILLAGES.values()])
-            self.__db.commit()
+    #         # insert all villages
+    #         self.__db.add_all([bhulekhVillages(**village) for village in VILLAGES.values()])
+    #         self.__db.commit()
 
-            lastRorVillageUpdateTime = self.__db.query(configSettings).filter(configSettings.key == "lastRorVillageUpdateTime").first()
-            lastRorVillageUpdateTime.value = str(datetime.datetime.now().timestamp())
-            self.__db.commit()
+    #         lastRorVillageUpdateTime = self.__db.query(configSettings).filter(configSettings.key == "lastRorVillageUpdateTime").first()
+    #         lastRorVillageUpdateTime.value = str(datetime.datetime.now().timestamp())
+    #         self.__db.commit()
 
-            # print("Villages updated successfully")
+    #         # print("Villages updated successfully")
 
-        except Exception as e:
-            # print("Error while updating villages: ")
-            # print(e)
-            self.__db.rollback()
+    #     except Exception as e:
+    #         # print("Error while updating villages: ")
+    #         # print(e)
+    #         self.__db.rollback()
     
     def __get_data(self, url, json=False, html=False):
         if json:

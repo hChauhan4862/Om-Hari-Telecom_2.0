@@ -52,5 +52,12 @@ async def pan_by_aadhaar(aadhaar: str):
         "X-Requested-With": "XMLHttpRequest"
     })
     if r.status_code == 200:
-        return hcRes(detail="Status Fatched Success", data={"msg": r.text})
-    pass
+        text = r.text
+        PAN = re.search(r'[A-Z]{2}\*{6}[0-9][A-Z]', text).group()
+        data = {"status": "not_linked"}
+        if PAN:
+            data = {"status": "linked","masked_pan": PAN}
+        
+        return hcRes(detail="Status Fatched Success", data=data)
+    
+    raise hcCustomException(detail="Something Went Wrong", error_code=500, error=True)

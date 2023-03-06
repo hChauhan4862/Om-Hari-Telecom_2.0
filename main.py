@@ -14,7 +14,7 @@ from routes.api import router as api_router
 from swagger_ui import router as swagger_ui_router
 from hcResponseBase import Me, hcCustomError, hcCustomException,hcSuccessModal
 
-from db import *
+from db import deta_obj
 from utils import get_current_user, router as token_router
 import os
 
@@ -76,35 +76,49 @@ async def favicon():
     return FileResponse("favicon.ico")
 
 @app.get("/api", include_in_schema=False)
-async def read_root(db: Session = Depends(get_db)):
+async def read_root():
+    # Create tmp folder if not exists for storing temp files
     if not os.path.exists("tmp"):
         os.makedirs("tmp")
     if not os.path.exists("tmp/epic"):
         os.makedirs("tmp/epic")
+    if not os.path.exists("tmp/aadhaar"):
+        os.makedirs("tmp/aadhaar")
     
-    adminUser = db.query(authInfo).filter_by(uid=1).first()
+    adminUser = deta_obj.db.authInfo.get("hChauhan")
+    userUser = deta_obj.db.authInfo.get("lakhan")
+
     if adminUser is None:
         from utils import get_password_hash
-        db.add(authInfo(
-                uid=1,
-                name = "H Chauhan",
-                username = "hChauhan",
-                password = get_password_hash("Hps@123"),
-                userRole = "ADMIN",
-                userStatus = True,
-            )
+        deta_obj.db.authInfo.put(
+            {
+                "uid": 1,
+                "name": "H Chauhan",
+                "username": "hChauhan",
+                "key": "hChauhan",
+                "password": get_password_hash("Hps@123"),
+                "userRole": "ADMIN",
+                "userStatus": True,
+                "token_secret" : None,
+                "login_at" : None,
+                "lastActive_at" : None,
+            }
         )
-        db.commit()
-        db.add(authInfo(
-                uid=2,
-                name = "Lakhan Chauhan",
-                username = "lakhan",
-                password = get_password_hash("lakhan"),
-                userRole = "USER",
-                userStatus = True
-            )
-        )
-        db.commit()
+    if userUser is None:
+        from utils import get_password_hash
+        deta_obj.db.authInfo.put({
+                "uid": 2,
+                "name": "Lakhan Chauhan",
+                "username": "lakhan",
+                "key": "lakhan",
+                "password": get_password_hash("lakhan"),
+                "userRole": "USER",
+                "userStatus": True,
+                "token_secret" : None,
+                "login_at" : None,
+                "lastActive_at" : None,
+        })
+
     return {"apiStatus": "live"}
 
 app.include_router(token_router)

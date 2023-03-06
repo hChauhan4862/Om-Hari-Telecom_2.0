@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from hcResponseBase import MeObj, hcCustomException, Me
 import uuid
 
-from db import *
+from db import deta_obj
 from config import *
 
 # openssl rand -hex 32
@@ -39,15 +39,15 @@ def get_password_hash(password):
 def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.datetime.utcnow() + expires_delta
+        expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
-async def get_current_user(security_scopes: SecurityScopes, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+async def get_current_user(security_scopes: SecurityScopes, token: str = Depends(oauth2_scheme)):
     credentials_exception = hcCustomException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         # detail="Could not validate credentials",
@@ -61,18 +61,20 @@ async def get_current_user(security_scopes: SecurityScopes, token: str = Depends
         token_data = TokenData(loginkey=loginkey)
     except JWTError:
         raise credentials_exception
-    user = db.query(authInfo).filter(authInfo.token_secret == token_data.loginkey, authInfo.userStatus == True).first()
-    if user is None:
+    
+    user = deta_obj.db.authInfo.fetch({"token_secret": token_data.loginkey, "userStatus": True}).items
+    if user is None or len(user) == 0:
         raise credentials_exception
+    
+    user = user[0]
     if security_scopes.scopes:
         if security_scopes.scopes[0] == ":ADMIN:":
-            if user.userRole != "ADMIN":
+            if user["userRole"] != "ADMIN":
                 raise hcCustomException(status_code=403,headers={"WWW-Authenticate": "Bearer"},detail="You are not allowed to access this resource")
-
-    db.query(authInfo).filter_by(token_secret=token_data.loginkey).update(dict(lastActive_at=datetime.datetime.utcnow()))
-    db.commit()
-    db.refresh(user)
-    return MeObj(uid=user.uid,role=user.userRole,username=user.username, db=db)
+            
+    user["lastActive_at"] = datetime.now().isoformat()
+    deta_obj.db.authInfo.put(user)
+    return MeObj(uid=user["uid"],role=user["userRole"],username=user["username"])
 
 router = APIRouter(
     prefix="/api/auth",
@@ -85,24 +87,26 @@ router = APIRouter(
 )
 
 @router.post("/token_issue", responses={status.HTTP_200_OK: {"description": "Successful Response", "model": TokenResponse}})
-async def token_generate(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def token_generate(form_data: OAuth2PasswordRequestForm = Depends()):
     credentials_exception = hcCustomException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Incorrect username or password",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    user = db.query(authInfo).filter(authInfo.username == form_data.username, authInfo.userStatus == True).first()
+    user = deta_obj.db.authInfo.get(form_data.username)
     
     # raise credentials_exception
-    if user is None or not verify_password(form_data.password, user.password):
+    if user is None or user["userStatus"] == False or not verify_password(form_data.password, user["password"]):
         raise credentials_exception
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)  # 365 days
-    key = str(user.uid) + random()
+    randomKey = str(user["uid"]) + random()
 
     access_token = create_access_token(
-        data={"sub": key}, expires_delta=access_token_expires
+        data={"sub": randomKey}, expires_delta=access_token_expires
     )
-    db.query(authInfo).filter_by(uid=user.uid).update(dict(token_secret=key, login_at=datetime.datetime.utcnow()))
-    db.commit()
+    user["lastActive_at"] = datetime.now().isoformat()
+    user["token_secret"] = randomKey
+    user["login_at"] = datetime.now().isoformat()
+    deta_obj.db.authInfo.put(user)
     return {"access_token": access_token, "token_type": "bearer", "expires_in": access_token_expires.total_seconds()}

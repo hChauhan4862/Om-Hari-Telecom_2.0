@@ -1,7 +1,6 @@
 from typing import Any, Callable, Optional, Sequence, Union, List
 from fastapi import Body, params
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 # class Token(BaseModel):
 #     access_token: str
@@ -37,17 +36,15 @@ class Me(BaseModel):
     uid: int
     username: str
     role: str
-    db: Session
     
     class Config:
         arbitrary_types_allowed = True
 
 class MeObj(object):
-    def __init__(self, username, uid,role, db):
+    def __init__(self, username, uid,role):
         self.username = username
         self.uid = uid
         self.role = role
-        self.db = db
 
 class hcRes(object):
     def __init__(self, error: bool = False, error_code: int = 200, detail: str = "Success", data: dict = {}):
