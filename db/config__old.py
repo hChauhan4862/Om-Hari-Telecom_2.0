@@ -9,7 +9,7 @@ from sqlalchemy import Column
 import platform
 import datetime
 
-DATABASE_URL = "mysql+pymysql://OmHariTelecom:%s@141.148.200.98:3306/omharitelecom?charset=utf8" % quote_plus("Oht202132")
+DATABASE_URL = "mysql+pymysql://OmHariTelecom:%s@localhost:3306/omharitelecom?charset=utf8" % quote_plus("Oht202132")
 
 Base = declarative_base()
 
