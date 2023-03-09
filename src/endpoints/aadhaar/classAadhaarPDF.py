@@ -2,7 +2,7 @@ import os
 import fitz  # pip install --upgrade pip; pip install --upgrade pymupdf
 
 import numpy as np
-from pyzbar.pyzbar import decode as QRDecode # pip install pyzbar
+# from pyzbar.pyzbar import decode as QRDecode # pip install pyzbar
 
 import gzip
 import base64
@@ -51,6 +51,8 @@ class AadhaarPDF:
         self.__date       = None
         self.__QR         = None
         self.__QRVERSION  = None
+
+        from pyzbar.pyzbar import decode as QRDecode # pip install pyzbar
 
         self.__doc = fitz.Document(stream=pdf_file.read())
 

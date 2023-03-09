@@ -1,21 +1,18 @@
 import time
-from traceback import print_tb
 from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI, Request, status, Security
-from fastapi.openapi.utils import get_openapi
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from fastapi.exceptions import RequestValidationError, FastAPIError
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 import uvicorn
-from sqlalchemy.exc import SQLAlchemyError
 
 from routes.api import router as api_router
 from swagger_ui import router as swagger_ui_router
-from hcResponseBase import Me, hcCustomError, hcCustomException,hcSuccessModal
+from hcResponseBase import hcCustomException
 
 from db import deta_obj
-from utils import get_current_user, router as token_router
+from utils import router as token_router
 import os
 
 app = FastAPI(

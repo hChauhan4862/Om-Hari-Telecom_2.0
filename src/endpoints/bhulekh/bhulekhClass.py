@@ -1,6 +1,5 @@
 import requests
 from bs4 import BeautifulSoup
-from sqlalchemy.sql.expression import func
 import datetime
 from src.endpoints._base import hcRes
 from db import deta_obj

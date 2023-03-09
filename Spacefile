@@ -1,0 +1,12 @@
+# Spacefile Docs: https://go.deta.dev/docs/spacefile/v0
+v: 0
+icon: logo.png
+micros:
+  - name: OM_HARI_TELECOM
+    src: .
+    engine: python3.9
+    path: home
+    presets:
+      api_keys: true
+    public_routes:
+      - "*"

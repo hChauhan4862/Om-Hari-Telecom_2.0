@@ -1,6 +1,5 @@
 from src.endpoints._base import *
 from src.models._base import *
-from fastapi import BackgroundTasks
 # from src.endpoints.bhulekh.village_updater import update_villages_list_task
 from src.endpoints.bhulekh.bhulekhClass import hcBhulekh
 import datetime
