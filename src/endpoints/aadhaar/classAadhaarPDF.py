@@ -258,7 +258,7 @@ class AadhaarPDF:
         
     def __bruteForcePassword(self):
         # check if the brute force dictionary exists
-        bruteForceDict = "tmp/names_list.json"
+        bruteForceDict = "names_list.json"
         assert os.path.exists(bruteForceDict), "Brute force dictionary not found"
         assert os.path.isfile(bruteForceDict), "Brute force dictionary not a file"
         assert bruteForceDict.endswith(".json"), "Brute force dictionary not a JSON file"

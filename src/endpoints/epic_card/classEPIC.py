@@ -32,14 +32,14 @@ class EPIC:
             s = requests.Session()
             s.headers.update(self.__API_HEADERS)
             temp = s.get("https://electoralsearch.in/",verify=False) # just to make sure we have a session with the server and cookies
-            assert temp.status_code == 200
+            assert temp.status_code == 200, "Could Not Connect To Server"
 
             URL = "https://electoralsearch.in/Home/GetCaptcha?image=true&id="+str("{:%a %b %d %Y %H:%M:%S} GMT+0530 (India Standard Time)".format(datetime.datetime.now()))
             req = s.get(URL,verify=False)
-            assert req.status_code == 200
-            assert "application/json" in req.headers["Content-Type"]
+            assert req.status_code == 200, "Could Not Connect To Server"
+            assert "application/json" in req.headers["Content-Type"], "Invalid Content Type"
 
-            with open("tmp/epic/"+self.__USERNAME+".json", "w") as f:
+            with open("/tmp/epic/"+self.__USERNAME+".json", "w") as f:
                 DATA = {
                     "COOKIE": req.cookies.get_dict(),
                     "CAPTCHA": None,
@@ -49,14 +49,15 @@ class EPIC:
             return hcRes(detail="Captcha Generated", data={ # return captcha image
                 "image": "data:image/png;base64,"+base64.b64encode(req.content).decode("utf-8")
             })
-        except:
+        except Exception as e:
+            return hcRes(detail="Server Error",data=str(e), error_code=400, error=True)
             pass
         return hcRes(detail="Server Error", error_code=400, error=True)
 
     ########## VERIFYING CAPTCHA ##########
     def verify_captcha(self, captcha):
         try:
-            with open("tmp/epic/"+self.__USERNAME+".json", "r") as f:
+            with open("/tmp/epic/"+self.__USERNAME+".json", "r") as f:
                 DATA = json.load(f)
             assert DATA["COOKIE"] != None
             if DATA["CAPTCHA"] != None:
@@ -65,7 +66,7 @@ class EPIC:
             assert self.fetch_details("S24 21", "S24", verify_captcha=captcha)
 
             DATA["CAPTCHA"] = captcha
-            with open("tmp/epic/"+self.__USERNAME+".json", "w") as f:
+            with open("/tmp/epic/"+self.__USERNAME+".json", "w") as f:
                 json.dump(DATA, f)
 
             return hcRes(detail="Captcha Verified", error_code=200, error=False)
@@ -73,14 +74,14 @@ class EPIC:
         except:
             pass
 
-        if not os.path.exists("tmp/epic/"+self.__USERNAME+".json"):
+        if not os.path.exists("/tmp/epic/"+self.__USERNAME+".json"):
             return hcRes(detail="Regenerate Captcha", error_code=400, error=True)
         return hcRes(detail="Captcha Could Not Verify", error_code=403, error=True)
 
     ########## GETTING EPIC CARD DETAILS ##########
     def fetch_details(self, epic, state="S24", verify_captcha=False):
         try:
-            with open("tmp/epic/"+self.__USERNAME+".json", "r") as f:
+            with open("/tmp/epic/"+self.__USERNAME+".json", "r") as f:
                 DATA = json.load(f)
             
             if verify_captcha: DATA["CAPTCHA"] = verify_captcha
@@ -115,15 +116,15 @@ class EPIC:
         if verify_captcha: return False
 
         # remove captcha file if exists
-        if os.path.exists("tmp/epic/"+self.__USERNAME+".json"):
-            os.remove("tmp/epic/"+self.__USERNAME+".json")
+        if os.path.exists("/tmp/epic/"+self.__USERNAME+".json"):
+            os.remove("/tmp/epic/"+self.__USERNAME+".json")
 
         return hcRes(detail="EX001: Captcha Auth Error, please regenerate captcha", error_code=403, error=True)
     
     ########## SEARCHING EPIC CARD DETAILS ##########
     def search_details(self,name,relative_name, age, location, page_no=1 ):
         try:
-            with open("tmp/epic/"+self.__USERNAME+".json", "r") as f:
+            with open("/tmp/epic/"+self.__USERNAME+".json", "r") as f:
                 DATA = json.load(f)
             assert DATA["CAPTCHA"] != None and DATA["COOKIE"] != None
 
@@ -157,11 +158,10 @@ class EPIC:
             pass
         
         # remove captcha file if exists
-        if os.path.exists("tmp/epic/"+self.__USERNAME+".json"):
-            os.remove("tmp/epic/"+self.__USERNAME+".json")
+        if os.path.exists("/tmp/epic/"+self.__USERNAME+".json"):
+            os.remove("/tmp/epic/"+self.__USERNAME+".json")
 
         return hcRes(detail="EX001: Captcha Auth Error, please regenerate captcha", error_code=403, error=True)
-    
     
     def fetchState(self):
         try:
